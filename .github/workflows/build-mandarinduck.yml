@@ -1,0 +1,125 @@
+name: Build MandarinDuck APK
+
+on:
+  push:
+    branches:
+      - mandarinduck-build
+    paths:
+      - "mandarinduck/**"
+      - ".github/workflows/build-mandarinduck.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout build files
+        uses: actions/checkout@v4
+
+      - name: Checkout TypeDuck Android
+        uses: actions/checkout@v4
+        with:
+          repository: TypeDuck-HK/TypeDuck-Android
+          ref: develop
+          path: typeduck
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+          cache-dependency-path: typeduck/**/*.gradle*
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android native toolchain
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platforms;android-34" "build-tools;34.0.0" "ndk;24.0.8215888" "cmake;3.22.1"
+
+      - name: Download CC-CEDICT
+        run: |
+          curl --fail --location --retry 4 --retry-delay 3 \
+            "https://www.mdbg.net/chinese/export/cedict/cedict_1_0_ts_utf-8_mdbg.txt.gz" \
+            --output cedict.txt.gz
+          test -s cedict.txt.gz
+
+      - name: Generate Traditional Mandarin-English lookup dictionary
+        run: |
+          python3 mandarinduck/build_dictionary.py \
+            cedict.txt.gz \
+            typeduck/app/src/main/assets/rime/mandarin_english.dict.yaml
+
+          grep -F $'nihao,1' typeduck/app/src/main/assets/rime/mandarin_english.dict.yaml | grep -F $'\t你好' | head -1
+          grep -F $'pingguo,1' typeduck/app/src/main/assets/rime/mandarin_english.dict.yaml | grep -F $'\t蘋果' | head -1
+          grep -F $'xiexie,1' typeduck/app/src/main/assets/rime/mandarin_english.dict.yaml | grep -F $'\t謝謝' | head -1
+
+      - name: Apply MandarinDuck Rime configuration
+        run: |
+          cp mandarinduck/mandarinduck.schema.yaml typeduck/app/src/main/assets/rime/
+          cp mandarinduck/mandarin_english.schema.yaml typeduck/app/src/main/assets/rime/
+          cp mandarinduck/default.custom.yaml typeduck/app/src/main/assets/rime/default.custom.yaml
+          cp mandarinduck/NOTICE-CC-CEDICT.txt typeduck/app/src/main/assets/rime/
+
+      - name: Give app a separate install identity
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          gradle = Path("typeduck/app/build.gradle")
+          s = gradle.read_text(encoding="utf-8")
+          s = s.replace('applicationId "hk.eduhk.typeduck"', 'applicationId "com.zarathustran.mandarinduck"')
+          s = s.replace('versionName "1.1.1"', 'versionName "1.0.0-mandarin"')
+          s = s.replace('setProperty("archivesBaseName", "TypeDuck-Android-$versionName")',
+                        'setProperty("archivesBaseName", "MandarinDuck-$versionName")')
+          s = s.replace('universalApk false', 'universalApk true')
+          gradle.write_text(s, encoding="utf-8")
+
+          strings = Path("typeduck/app/src/main/res/values/strings.xml")
+          s = strings.read_text(encoding="utf-8")
+          s = s.replace('<string name="app_name">TypeDuck</string>',
+                        '<string name="app_name">MandarinDuck</string>')
+          strings.write_text(s, encoding="utf-8")
+          PY
+
+      - name: Build debug APK
+        working-directory: typeduck
+        env:
+          CI_NAME: MandarinDuck CI
+          CI_BRANCH: mandarinduck-build
+        run: |
+          chmod +x gradlew
+          ./gradlew app:assembleDebug --stacktrace --no-daemon
+
+      - name: Collect and verify universal APK
+        run: |
+          mkdir -p release
+          APK="$(find typeduck/app/build/outputs/apk -type f -name '*universal*debug*.apk' | head -n 1)"
+          if [ -z "$APK" ]; then
+            echo "Universal APK not found. Available APKs:"
+            find typeduck/app/build/outputs/apk -type f -name '*.apk' -print
+            exit 1
+          fi
+          cp "$APK" release/MandarinDuck-debug.apk
+          cp mandarinduck/NOTICE-CC-CEDICT.txt release/
+          sha256sum release/MandarinDuck-debug.apk | tee release/MandarinDuck-debug.apk.sha256
+
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          "$APKSIGNER" verify --verbose release/MandarinDuck-debug.apk
+
+      - name: Upload installable APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: MandarinDuck-APK
+          path: release/
+          if-no-files-found: error
+          retention-days: 30

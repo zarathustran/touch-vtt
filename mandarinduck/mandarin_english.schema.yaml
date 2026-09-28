@@ -1,0 +1,24 @@
+# Rime schema used only to compile the lookup dictionary.
+# encoding: utf-8
+
+schema:
+  schema_id: mandarin_english
+  name: Mandarin English Lookup
+  version: "1.0.0"
+
+switches:
+  - name: ascii_mode
+    reset: 0
+    states: [ 中文, 英文 ]
+
+engine:
+  processors:
+    - ascii_composer
+  segmentors:
+    - ascii_segmentor
+  translators:
+    - table_translator
+
+translator:
+  dictionary: mandarin_english
+  enable_user_dict: false

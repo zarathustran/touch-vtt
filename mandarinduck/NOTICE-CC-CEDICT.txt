@@ -1,0 +1,17 @@
+MandarinDuck dictionary notice
+
+This build derives its Traditional Chinese -> English lookup data from CC-CEDICT.
+
+Source:
+https://www.mdbg.net/chinese/dictionary?page=cc-cedict
+
+CC-CEDICT is licensed under the Creative Commons Attribution-ShareAlike 4.0
+International License (CC BY-SA 4.0):
+https://creativecommons.org/licenses/by-sa/4.0/
+
+The generated Rime lookup dictionary normalizes CC-CEDICT Hanyu Pinyin for
+matching TypeDuck/Rime candidate pronunciations and preserves Traditional
+Chinese headwords and English definitions.
+
+TypeDuck Android and its bundled components retain their respective upstream
+licenses and attribution.

@@ -1,0 +1,49 @@
+# Rime schema
+# encoding: utf-8
+
+__include: template:/
+
+schema:
+  schema_id: mandarinduck
+  name: "普通話・繁體 + English"
+  version: "1.0.0"
+  author:
+    - MandarinDuck adaptation
+  description: |
+    Mandarin Hanyu Pinyin input with Traditional Chinese candidates
+    and English definitions from CC-CEDICT.
+  dependencies:
+    - mandarin_english
+
+menu:
+  page_size: 50
+
+speller:
+  algebra:
+    - abbrev/^([a-z]).+$/$1/
+    - derive/^([nl])ve$/$1ue/
+    - derive/^([jqxy])u/$1v/
+    - derive/un$/uen/
+    - derive/ui$/uei/
+    - derive/iu$/iou/
+
+translator:
+  dictionary: luna_pinyin
+  enable_sentence: false
+  enable_user_dict: false
+  encode_commit_history: false
+  always_show_comments: true
+  preedit_format:
+    - xform/([nl])v/$1ü/
+    - xform/([nl])ue/$1üe/
+    - xform/([jqxy])v/$1u/
+  comment_format:
+    - xform/^/\f/
+
+dictionary_lookup_filter:
+  dictionary: mandarin_english
+
+__patch:
+  - common:/disable_completion?
+  - common:/enable_correction?
+  - common:/separate_candidates?

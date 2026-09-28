@@ -1,0 +1,8 @@
+# MandarinDuck mobile schema selection
+# encoding: utf-8
+
+patch:
+  schema_list:
+    - schema: mandarinduck
+  menu:
+    page_size: 50
